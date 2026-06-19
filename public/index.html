@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Realtime Chat Demo</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 800px; margin: 40px auto; padding: 0 20px; }
+    .chat { border: 1px solid #ddd; border-radius: 8px; padding: 16px; background: #f9f9f9; }
+    .messages { min-height: 240px; max-height: 400px; overflow-y: auto; margin-bottom: 16px; border: 1px solid #ccc; border-radius: 6px; padding: 12px; background: #fff; }
+    .message { margin-bottom: 12px; }
+    .message span { display: block; }
+    .message .meta { color: #555; font-size: 0.9rem; }
+  </style>
+</head>
+<body>
+  <h1>Realtime Chat Demo</h1>
+  <div class="chat">
+    <div class="messages" id="messages"></div>
+    <form id="chatForm">
+      <input id="messageInput" type="text" placeholder="Type a message" autocomplete="off" style="width: calc(100% - 110px); padding: 10px;" />
+      <button type="submit" style="width: 90px; padding: 10px; margin-left: 10px;">Send</button>
+    </form>
+  </div>
+
+  <script src="https://cdn.socket.io/4.8.3/socket.io.min.js"></script>
+  <script>
+    const socket = io('http://localhost:3000');
+    const messagesEl = document.getElementById('messages');
+    const chatForm = document.getElementById('chatForm');
+    const messageInput = document.getElementById('messageInput');
+
+    function appendMessage({ from, text, timestamp }) {
+      const item = document.createElement('div');
+      item.className = 'message';
+      item.innerHTML = `<span class="meta">${from} · ${new Date(timestamp).toLocaleTimeString()}</span><span>${text}</span>`;
+      messagesEl.appendChild(item);
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+
+    socket.on('connect', () => {
+      appendMessage({ from: 'System', text: 'Connected to server.', timestamp: new Date().toISOString() });
+    });
+
+    socket.on('chatMessage', (payload) => {
+      appendMessage({ from: 'Chat', text: payload.message, timestamp: payload.timestamp });
+    });
+
+    socket.on('jobCompleted', ({ jobId }) => {
+      appendMessage({ from: 'System', text: `Notification job completed: ${jobId}`, timestamp: new Date().toISOString() });
+    });
+
+    chatForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const text = messageInput.value.trim();
+      if (!text) return;
+
+      try {
+        const response = await fetch('http://localhost:3000/notify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: text })
+        });
+
+        let body = null;
+        const textBody = await response.text();
+        if (textBody) {
+          try {
+            body = JSON.parse(textBody);
+          } catch (parseError) {
+            appendMessage({ from: 'System', text: `Invalid JSON response: ${parseError.message}`, timestamp: new Date().toISOString() });
+          }
+        }
+
+        if (!response.ok) {
+          const errorText = body?.error || response.statusText;
+          appendMessage({ from: 'System', text: `Send failed: ${errorText}`, timestamp: new Date().toISOString() });
+        } else if (body?.fallback) {
+          appendMessage({ from: 'System', text: 'Message sent as DB fallback because queue failed.', timestamp: new Date().toISOString() });
+        }
+      } catch (error) {
+        appendMessage({ from: 'System', text: `Send failed: ${error.message}`, timestamp: new Date().toISOString() });
+      }
+
+      messageInput.value = '';
+    });
+  </script>
+</body>
+</html>
+  

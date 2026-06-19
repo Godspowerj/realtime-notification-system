@@ -19,6 +19,7 @@ const worker = new Worker('notifications', async (job) => {
     });
     
     console.log(`[Worker] Finished cooking: "${savedNotification.message}"`);
+    return savedNotification;
     
 }, { connection }); 
 
