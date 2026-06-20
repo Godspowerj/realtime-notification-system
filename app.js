@@ -2,8 +2,21 @@ const express = require('express');
 const { notificationQueue } = require('./queue');
 const app = express();
 const {PrismaClient} = require('@prisma/client');
+const { createBullBoard } = require('@bull-board/api');
+const { BullMQAdapter } = require('@bull-board/api/bullMQAdapter');
+const { ExpressAdapter } = require('@bull-board/express');
 
-const prisma = new PrismaClient()
+const prisma = new PrismaClient();
+
+const serverAdapter = new ExpressAdapter();
+serverAdapter.setBasePath('/admin/queues');
+
+createBullBoard({
+  queues: [new BullMQAdapter(notificationQueue)],
+  serverAdapter: serverAdapter,
+});
+
+app.use('/admin/queues', serverAdapter.getRouter());
 
 app.use(express.json());
 
