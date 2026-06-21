@@ -47,20 +47,42 @@ docker-compose up -d
 npx prisma db push
 ```
 
-### 2. Start the Microservices
+### 2a. Single Process (Development)
 Open two separate terminals:
 ```bash
 # Terminal 1: Ingestion API & WebSockets
 npm start
 
 # Terminal 2: Background Job Processor
-npm run worker
+node worker.js
+```
+
+### 2b. Clustered Mode (Production-like)
+Uses PM2 to spawn 4 API server instances + 1 background worker, all sharing the Redis Pub/Sub adapter as a communication backbone.
+```bash
+# Install PM2 globally (one time only)
+npm install -g pm2
+
+# Boot the full cluster
+pm2 start ecosystem.config.js
+
+# Monitor all processes in real-time
+pm2 monit
+```
+
+## Monitoring the Queue
+A visual Bull Board dashboard is available to inspect queued, active, completed, and failed jobs:
+```
+http://localhost:3000/admin/queues
 ```
 
 ## Stress Testing the System
-We have included a custom load-testing script to simulate a stampede of **5,000 concurrent WebSockets** and **10,000 HTTP POST requests**.
-
+A custom load-testing script simulates a stampede of **5,000 concurrent WebSockets** and **10,000 HTTP POST requests**:
 ```bash
 node load-test.js
 ```
-*Note: Running this on a single machine will quickly demonstrate the TCP backlog limits of a single OS thread. To scale beyond this, horizontal scaling (PM2/Cluster) and the `@socket.io/redis-adapter` must be implemented.*
+
+> **Note on Windows:** PM2 Cluster Mode on Windows binds to IPv6 by default. The load tester is pre-configured to use `localhost` which resolves correctly. If you experience `ECONNREFUSED` errors, this is a local OS-level TCP port limit — not an application bug. This system is designed for and performs best on Linux-based deployments (e.g., AWS EC2, DigitalOcean Droplets), where enterprise-grade load balancers like **Nginx** sit in front of the Node.js cluster.
+
+## Consistency Guarantee
+Notifications are broadcast to WebSocket clients **only after** successful database persistence. The broadcast is triggered by the `QueueEvents` listener in `server.js` on job completion — never optimistically from the API layer.

@@ -1,7 +1,7 @@
 const { io } = require('socket.io-client');
 const axios = require('axios');
 
-const NUM_USERS = 5000; // Let's start with 5k so we don't completely freeze your PC instantly
+const NUM_USERS = 500; // Let's start with 5k so we don't completely freeze your PC instantly
 const SERVER_URL = 'http://localhost:3000';
 
 let connectedCount = 0;

@@ -44,7 +44,6 @@ app.get('/health', (req, res) => {
 })
 
 
-
 app.post('/notify', async (req, res) => {
     const { message } = req.body;
     if (!message) {
@@ -56,11 +55,8 @@ app.post('/notify', async (req, res) => {
         timestamp: new Date().toISOString()
     };
 
-    const io = req.app.get('io');
-    if (io) {
-        io.emit('chatMessage', payload);
-    }
-
+    // NOTE: We do NOT broadcast here. Broadcasting happens in the worker AFTER
+    // the message is safely saved to the database. This guarantees consistency.
     try {
         await notificationQueue.add('send-notification', payload);
         return res.status(200).json({ status: 'published', queued: true, message: payload });

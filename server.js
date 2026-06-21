@@ -16,6 +16,26 @@ const io = new Server(httpServer, {
 
 app.set('io', io);
 
+// 1. Bring in the tools to connect Socket.io to Redis
+const { createAdapter } = require("@socket.io/redis-adapter");
+const { createClient } = require("redis");
+
+// 2. Create the Microphone (Publisher) so this server can shout to other servers
+const pubClient = createClient({ url: "redis://127.0.0.1:6380" });
+
+// 3. Create the Radio Receiver (Subscriber) so this server can listen to other servers
+const subClient = pubClient.duplicate();
+
+// 4. Connect BOTH the Microphone and Radio to Redis at the same time
+Promise.all([pubClient.connect(), subClient.connect()]).then(() => {
+  // 5. Once connected, physically plug them into our Socket.io megaphone
+  io.adapter(createAdapter(pubClient, subClient));
+  console.log("🔗 Redis Adapter connected! (Radio Station Online)");
+});
+// -----------------------------------
+
+
+
 io.on ('connection', (socket) => {
   console.log(`User connected: ${socket.id}`);
 

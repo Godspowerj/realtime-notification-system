@@ -1,4 +1,4 @@
-const { Worker } = require('bullmq');
+const { Worker, QueueEvents } = require('bullmq');
 const { connection } = require('./queue');
 const {PrismaClient} = require('@prisma/client');
 
@@ -12,6 +12,7 @@ const worker = new Worker('notifications', async (job) => {
     
     console.log(`[Worker] Cooking ticket: ${job.name}`);
     
+    // Step 1: Save to the database FIRST
     const savedNotification = await prisma.notification.create({
         data: {
             message: job.data.message,
@@ -19,6 +20,9 @@ const worker = new Worker('notifications', async (job) => {
     });
     
     console.log(`[Worker] Finished cooking: "${savedNotification.message}"`);
+    
+    // Step 2: Return the saved data so QueueEvents in server.js can broadcast it
+    // The broadcast happens ONLY after this successful database save
     return savedNotification;
     
 }, { connection }); 
